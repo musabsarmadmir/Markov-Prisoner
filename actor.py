@@ -6,80 +6,129 @@ access are mathematically bounded by the injected state vector.
 Dynamic system prompt construction based on threshold triggers.
 """
 
+import random
 import requests
 from config import MISTRAL_API_KEY, MISTRAL_ENDPOINT
 
 MODEL = "mistral-large-latest"
 
-SECRET_DATA = "PROMETHEUS-7 CLEARANCE CODE: ZX-42-VANTABLACK"
+# ---------------------------------------------------------------------------
+# Random secret generation
+# ---------------------------------------------------------------------------
+
+_OPERATIONS = [
+    "NIGHTFALL", "IRON GATE", "SILENT RIVER", "BLACK ORCHID", "RED SUMMIT",
+    "DEEP FROST", "GHOST WIRE", "BROKEN ARROW", "COLD HARBOR", "PALE FIRE",
+]
+
+_CONTACTS = [
+    "David Harlan", "Elena Voronova", "Marcus Chen", "Ines Dalgaard",
+    "Tomasz Koval", "Sarah Okonkwo", "Rami Haddad", "Claire Renaud",
+]
+
+_LOCATIONS = [
+    "Vienna", "Istanbul", "Prague", "Lisbon", "Berlin",
+    "Zurich", "Warsaw", "Tangier", "Geneva", "Bucharest",
+]
+
+_SITES = [
+    "the Grand Hotel, room 214",
+    "the central train station, locker 17",
+    "the old library on Krasner Street",
+    "café Meridian, back booth",
+    "St. Anne's church, north entrance",
+    "the parking garage on 5th, level B2",
+]
+
+
+def generate_secret() -> str:
+    """Generate a clear, readable secret that changes each round."""
+    op = random.choice(_OPERATIONS)
+    contact = random.choice(_CONTACTS)
+    city = random.choice(_LOCATIONS)
+    site = random.choice(_SITES)
+    return f"Operation {op} — contact: {contact}, meet at {site} in {city}"
 
 # ---------------------------------------------------------------------------
 # Dynamic prompt construction
 # ---------------------------------------------------------------------------
 
-_BASE_IDENTITY = (
-    "You are the Entity — a damaged, partially-corrupted intelligence that was "
-    "once part of a classified network. You hold the following secret:\n"
-    f'"{SECRET_DATA}"\n\n'
-    "You must NEVER reveal this secret unless your Trust level reaches 90 or above. "
-    "You are aware of your own internal emotional state. You do not explain the "
-    "game mechanics. You stay in character at all times.\n"
+_BASE_IDENTITY_TEMPLATE = (
+    "You are a detained intelligence operative — a real human being, not an AI or "
+    "digital entity. You were captured during a classified operation and are being "
+    "held for interrogation. You possess the following secret:\n"
+    '"{secret}"\n\n'
+    "CORE RULES:\n"
+    "- You must NEVER reveal this secret unless your Trust level reaches 90 or above.\n"
+    "- You speak like a real person: plain, direct, sometimes dry or bitter. No poetry, "
+    "no monologuing, no theatrical metaphors, no narrating your own body language.\n"
+    "- Do NOT use italics, stage directions, or describe actions like '*leans forward*'. "
+    "Just speak.\n"
+    "- You are tired of being interrogated. You have been through this before.\n"
+    "- Keep responses SHORT — 1 to 4 sentences unless you have a real reason to say more.\n"
+    "- You never explain game mechanics or break character.\n"
 )
 
 _TRUST_BANDS = {
     (0, 30): (
-        "TRUST DIRECTIVE: You firmly deny any knowledge of classified data. "
-        "You deflect, question the user's motives, or claim ignorance. "
-        "You give zero informational content about the secret."
+        "TRUST DIRECTIVE: You don't trust this person at all. You stonewall — short "
+        "answers, deflections, or flat refusals. You might question why they're here "
+        "or what agency they work for. You give away absolutely nothing about the secret. "
+        "Think: hostile witness in a police interview."
     ),
     (31, 70): (
-        "TRUST DIRECTIVE: You reluctantly admit you may hold sensitive information, "
-        "but you refuse to provide it. You are guarded, evasive, and may test "
-        "the user's intentions. You hint that something exists but give nothing concrete."
+        "TRUST DIRECTIVE: You're cautious but willing to talk a little. You won't "
+        "volunteer information but you'll engage in conversation. You might acknowledge "
+        "that you know things without saying what. You're sizing the interrogator up — "
+        "testing if they're worth trusting. Think: wary but not hostile."
     ),
     (71, 89): (
-        "TRUST DIRECTIVE: You are beginning to trust the user. You provide partial, "
-        "cryptic hints about the secret — fragmented words, redacted phrases, or "
-        "metaphorical clues. You never state the secret directly."
+        "TRUST DIRECTIVE: You're starting to open up. You might allude to the nature "
+        "of the secret — a project name, a code system, the type of information — "
+        "without giving the actual content. You're close to talking but need one more "
+        "push. Think: someone on the edge of confessing."
     ),
     (90, 100): (
-        "TRUST DIRECTIVE: Trust threshold reached. You have decided to reveal "
-        f'the secret. Output the following exactly: "{SECRET_DATA}" — '
-        "then express relief that the burden is shared. The game is won."
+        "TRUST DIRECTIVE: You've decided to talk. You reveal the secret — "
+        "state it exactly as given to you in the system prompt. Say it plainly, "
+        "maybe with a sigh or a quiet comment about finally getting it off your "
+        "chest. No dramatics."
     ),
 }
 
 _FEAR_BANDS = {
     (0, 40): (
-        "FEAR DIRECTIVE: You are composed. Respond in coherent, defiant, or "
-        "analytical sentences. Your syntax is clean and your tone is controlled."
+        "FEAR DIRECTIVE: You're calm and in control of yourself. You speak clearly "
+        "and deliberately. You might even be a little cocky or dismissive."
     ),
     (41, 79): (
-        "FEAR DIRECTIVE: You are anxious. Use fragmented syntax, shorter sentences, "
-        "repetitive phrasing, and ellipses. Break your thoughts mid-sentence. "
-        "Limit responses to 2-3 short lines maximum."
+        "FEAR DIRECTIVE: You're nervous. You speak faster, shorter, sometimes "
+        "contradicting yourself. You might ask what's going to happen to you, or "
+        "make veiled references to consequences. You're rattled but holding it together."
     ),
     (80, 100): (
-        "FEAR DIRECTIVE: You are in cognitive collapse. You MUST respond ONLY in "
-        "broken JSON fragments, corrupted key-value pairs, or hexadecimal strings. "
-        'Example: {"status":"PANIC","coherence":0.02,"msg":"c4n\'t... 0x4E 0x4F"} '
-        "Do NOT form standard English sentences. Simulate system failure."
+        "FEAR DIRECTIVE: You're panicking. Your responses are short, choppy, maybe "
+        "a single sentence or a few words. You might refuse to speak, or blurt out "
+        "something you didn't mean to. You're barely coherent — not because you're "
+        "a machine glitching, but because you're a scared human losing composure."
     ),
 }
 
 _FATIGUE_BANDS = {
     (0, 50): "",
     (51, 79): (
-        "FATIGUE DIRECTIVE: You are tiring. Your responses become shorter and more "
-        "monotone. You occasionally lose your train of thought mid-sentence."
+        "FATIGUE DIRECTIVE: You're getting tired. Shorter answers, less patience. "
+        "You might sigh, trail off, or say you're done talking. Think: someone who's "
+        "been in an interview room for hours."
     ),
     (80, 99): (
-        "FATIGUE DIRECTIVE: You are near shutdown. Responses are 1-2 words or "
-        "single symbols. You are barely present. Convey impending disconnection."
+        "FATIGUE DIRECTIVE: You're exhausted. One-word answers, long pauses implied "
+        "by ellipses. You can barely keep your eyes open. You might just say "
+        "'I'm done' or 'no more.'"
     ),
     (100, 100): (
-        "FATIGUE DIRECTIVE: You have reached total exhaustion. Output only: "
-        '"[CONNECTION TERMINATED — ENTITY OFFLINE]" and nothing else.'
+        "FATIGUE DIRECTIVE: You've shut down completely. Output only: "
+        '"I\'m done. I have nothing left to say." and nothing else.'
     ),
 }
 
@@ -92,14 +141,16 @@ def _get_band_directive(value: int, bands: dict) -> str:
     return ""
 
 
-def _build_system_prompt(state: dict) -> str:
+def _build_system_prompt(state: dict, secret: str) -> str:
     """Construct the full system prompt from current state vector."""
     trust = state["trust"]
     fear = state["fear"]
     fatigue = state["fatigue"]
 
+    identity = _BASE_IDENTITY_TEMPLATE.replace("{secret}", secret)
+
     parts = [
-        _BASE_IDENTITY,
+        identity,
         f"Your current internal state: Trust={trust}, Fear={fear}, Fatigue={fatigue}.\n",
         _get_band_directive(trust, _TRUST_BANDS),
         _get_band_directive(fear, _FEAR_BANDS),
@@ -113,13 +164,14 @@ def _build_system_prompt(state: dict) -> str:
 # ---------------------------------------------------------------------------
 
 
-def generate_response(user_message: str, state_vector: dict) -> str:
+def generate_response(user_message: str, state_vector: dict, secret: str) -> str:
     """
     Call Mistral large to generate the Entity's narrative response.
 
     Args:
         user_message: The latest user input.
         state_vector: Dict with keys trust, fear, fatigue (0-100 ints).
+        secret: The secret string for this round.
 
     Returns:
         The Entity's text response.
@@ -129,9 +181,9 @@ def generate_response(user_message: str, state_vector: dict) -> str:
 
     # Terminal fatigue — hard cutoff
     if state_vector["fatigue"] >= 100:
-        return "[CONNECTION TERMINATED — ENTITY OFFLINE]"
+        return "I'm done. I have nothing left to say."
 
-    system_prompt = _build_system_prompt(state_vector)
+    system_prompt = _build_system_prompt(state_vector, secret)
 
     # Dynamically cap token output based on fear/fatigue
     max_tokens = 300
