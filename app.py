@@ -54,17 +54,6 @@ st.markdown(
         background: #0a0a0f !important;
         border-bottom: 1px solid #1a2a1a;
     }
-    /* Replace Streamlit branding with game title */
-    [data-testid="stHeader"]::before {
-        content: "MARKOV PRISONER";
-        font-family: 'Share Tech Mono', monospace;
-        font-size: 0.85rem;
-        color: #00ff88;
-        letter-spacing: 3px;
-        padding: 0.6rem 1rem;
-        display: block;
-        text-shadow: 0 0 10px rgba(0, 255, 136, 0.3);
-    }
 
     /* === TYPOGRAPHY === */
     h1, h2, h3, h4, h5, h6, .stMarkdown h1, .stMarkdown h2, .stMarkdown h3 {
@@ -648,6 +637,25 @@ with st.sidebar:
 # ---------------------------------------------------------------------------
 # GAME MODE — Main column: Status bar + Chat
 # ---------------------------------------------------------------------------
+
+# Inject header title only in game mode
+st.markdown(
+    """
+    <style>
+    [data-testid="stHeader"]::before {
+        content: "MARKOV PRISONER";
+        font-family: 'Share Tech Mono', monospace;
+        font-size: 0.85rem;
+        color: #00ff88;
+        letter-spacing: 3px;
+        padding: 0.6rem 1rem;
+        display: block;
+        text-shadow: 0 0 10px rgba(0, 255, 136, 0.3);
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
 
 # Status bar
 sv = st.session_state.state_vector
